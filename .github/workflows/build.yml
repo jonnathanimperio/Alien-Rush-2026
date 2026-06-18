@@ -1,0 +1,138 @@
+name: Build Alien Rush FX AAB
+ 
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+ 
+jobs:
+  build:
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+ 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+ 
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+ 
+      - name: Install dependencies
+        run: npm install
+ 
+      - name: Add Android platform
+        run: npx cap add android
+ 
+      - name: Sync Capacitor
+        run: npx cap sync android
+ 
+      - name: Replace app icon with custom icon
+        run: |
+          ICON_BASE="android/app/src/main/res"
+          declare -A SIZES=( ["mdpi"]=48 ["hdpi"]=72 ["xhdpi"]=96 ["xxhdpi"]=144 ["xxxhdpi"]=192 )
+          for density in "${!SIZES[@]}"; do
+            size=${SIZES[$density]}
+            cp resources/icon-${size}.png ${ICON_BASE}/mipmap-${density}/ic_launcher.png
+            cp resources/icon-${size}.png ${ICON_BASE}/mipmap-${density}/ic_launcher_round.png
+            cp resources/icon-${size}.png ${ICON_BASE}/mipmap-${density}/ic_launcher_foreground.png 2>/dev/null || true
+          done
+          echo "Icons replaced!"
+ 
+      - name: Set screen orientation to landscape + fullscreen
+        run: |
+          # Force landscape and fullscreen in AndroidManifest.xml
+          sed -i 's/android:screenOrientation="[^"]*"/android:screenOrientation="landscape"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<activity/<activity android:screenOrientation="landscape" android:configChanges="orientation|screenSize|keyboardHidden"/' android/app/src/main/AndroidManifest.xml
+          # Remove duplicate screenOrientation if any
+          python3 -c "
+          import re
+          with open('android/app/src/main/AndroidManifest.xml','r') as f: c=f.read()
+          # Ensure only one screenOrientation
+          c=re.sub(r'android:screenOrientation=\"[^\"]*\"\s*android:screenOrientation=\"[^\"]*\"','android:screenOrientation=\"landscape\"',c)
+          # Add fullscreen theme
+          c=c.replace('android:theme=\"@style/AppTheme\"','android:theme=\"@style/AppTheme\" android:windowSoftInputMode=\"adjustResize\"')
+          with open('android/app/src/main/AndroidManifest.xml','w') as f: f.write(c)
+          "
+ 
+      - name: Configure fullscreen (no status bar)
+        run: |
+          # Add fullscreen to styles.xml
+          cat > android/app/src/main/res/values/styles.xml << 'STYLES'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+            <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
+              <item name="android:windowNoTitle">true</item>
+              <item name="android:windowFullscreen">true</item>
+              <item name="android:windowContentOverlay">@null</item>
+              <item name="android:statusBarColor">@android:color/black</item>
+              <item name="android:navigationBarColor">@android:color/black</item>
+            </style>
+            <style name="AppTheme.NoActionBar" parent="AppTheme">
+              <item name="android:windowActionBar">false</item>
+              <item name="android:windowNoTitle">true</item>
+            </style>
+          </resources>
+          STYLES
+ 
+      - name: Add AdMob META tag to AndroidManifest
+        run: |
+          sed -i 's|</application>|<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-6853379352980306~7008734812"/>\n</application>|' android/app/src/main/AndroidManifest.xml
+ 
+      - name: Add internet permissions
+        run: |
+          sed -i 's|</manifest>|<uses-permission android:name="android.permission.INTERNET"/>\n<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n</manifest>|' android/app/src/main/AndroidManifest.xml
+ 
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+ 
+      - name: Create keystore.properties
+        run: |
+          cat > android/app/keystore.properties << EOF
+          storeFile=keystore.jks
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
+ 
+      - name: Configure signing in build.gradle
+        run: |
+          python3 -c "
+          with open('android/app/build.gradle','r') as f: c=f.read()
+ 
+          signing = '''
+    signingConfigs {
+        release {
+            def props = new Properties()
+            def propsFile = file('keystore.properties')
+            if (propsFile.exists()) {
+                props.load(new FileInputStream(propsFile))
+                storeFile file(props['storeFile'])
+                storePassword props['storePassword']
+                keyAlias props['keyAlias']
+                keyPassword props['keyPassword']
+            }
+        }
+    }
+'''
+          c = c.replace('android {', 'android {\n' + signing)
+          c = c.replace('buildTypes {', 'buildTypes {\n        release {\n            signingConfig signingConfigs.release\n            minifyEnabled false\n            proguardFiles getDefaultProguardFile(\"proguard-android.txt\"), \"proguard-rules.pro\"\n        }')
+          # Remove duplicate release block if exists
+          with open('android/app/build.gradle','w') as f: f.write(c)
+          "
+ 
+      - name: Build AAB
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew bundleRelease
+ 
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: alien-rush-fx-release
+          path: android/app/build/outputs/bundle/release/*.aab
