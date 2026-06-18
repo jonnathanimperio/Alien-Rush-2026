@@ -1,0 +1,14 @@
+{
+  "name": "alien-rush-fx",
+  "version": "2.0.0",
+  "description": "Alien Rush FX - defenda a galaxia",
+  "scripts": {
+    "sync": "npx cap sync"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/cli": "^6.1.0",
+    "@capacitor/core": "^6.1.0",
+    "@capacitor-community/admob": "^6.0.0"
+  }
+}

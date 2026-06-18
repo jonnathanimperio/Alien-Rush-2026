@@ -1,0 +1,16 @@
+{
+  "appId": "com.imperiosoftware.alienrushfx",
+  "appName": "Alien Rush FX",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#000000"
+  },
+  "plugins": {
+    "AdMob": {
+      "androidAppId": "ca-app-pub-6853379352980306~7008734812"
+    }
+  }
+}
