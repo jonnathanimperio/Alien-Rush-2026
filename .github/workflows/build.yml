@@ -37,7 +37,7 @@ jobs:
           sed -i 's|</application>|<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-6853379352980306~7008734812"/></application>|' $M
           sed -i 's|</manifest>|<uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/></manifest>|' $M
       - name: Fullscreen
-        run: echo '<?xml version="1.0" encoding="utf-8"?><resources><style name="AppTheme" parent="Theme.AppCompat.NoActionBar"><item name="android:windowNoTitle">true</item><item name="android:windowFullscreen">true</item><item name="android:windowContentOverlay">@null</item></style></resources>' > android/app/src/main/res/values/styles.xml
+        run: echo '<?xml version="1.0" encoding="utf-8"?><resources><style name="AppTheme" parent="Theme.AppCompat.NoActionBar"><item name="android:windowNoTitle">true</item><item name="android:windowFullscreen">true</item><item name="android:windowContentOverlay">@null</item></style><style name="AppTheme.NoActionBar" parent="AppTheme"><item name="android:windowActionBar">false</item><item name="android:windowNoTitle">true</item></style><style name="AppTheme.NoActionBarLaunch" parent="AppTheme.NoActionBar"><item name="android:background">@android:color/black</item></style></resources>' > android/app/src/main/res/values/styles.xml
       - name: Keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
       - name: Sign config
