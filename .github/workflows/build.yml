@@ -1,3 +1,4 @@
+L
 name: Build Alien Rush FX AAB
  
 on:
@@ -33,99 +34,46 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
  
-      - name: Replace app icon with custom icon
+      - name: Replace app icons
         run: |
-          ICON_BASE="android/app/src/main/res"
-          declare -A SIZES=( ["mdpi"]=48 ["hdpi"]=72 ["xhdpi"]=96 ["xxhdpi"]=144 ["xxxhdpi"]=192 )
-          for density in "${!SIZES[@]}"; do
-            size=${SIZES[$density]}
-            cp resources/icon-${size}.png ${ICON_BASE}/mipmap-${density}/ic_launcher.png
-            cp resources/icon-${size}.png ${ICON_BASE}/mipmap-${density}/ic_launcher_round.png
-            cp resources/icon-${size}.png ${ICON_BASE}/mipmap-${density}/ic_launcher_foreground.png 2>/dev/null || true
-          done
-          echo "Icons replaced!"
+          BASE="android/app/src/main/res"
+          cp resources/icon-48.png $BASE/mipmap-mdpi/ic_launcher.png
+          cp resources/icon-72.png $BASE/mipmap-hdpi/ic_launcher.png
+          cp resources/icon-96.png $BASE/mipmap-xhdpi/ic_launcher.png
+          cp resources/icon-144.png $BASE/mipmap-xxhdpi/ic_launcher.png
+          cp resources/icon-192.png $BASE/mipmap-xxxhdpi/ic_launcher.png
+          cp resources/icon-48.png $BASE/mipmap-mdpi/ic_launcher_round.png
+          cp resources/icon-72.png $BASE/mipmap-hdpi/ic_launcher_round.png
+          cp resources/icon-96.png $BASE/mipmap-xhdpi/ic_launcher_round.png
+          cp resources/icon-144.png $BASE/mipmap-xxhdpi/ic_launcher_round.png
+          cp resources/icon-192.png $BASE/mipmap-xxxhdpi/ic_launcher_round.png
  
-      - name: Set screen orientation to landscape + fullscreen
+      - name: Configure Android manifest
         run: |
-          # Force landscape and fullscreen in AndroidManifest.xml
-          sed -i 's/android:screenOrientation="[^"]*"/android:screenOrientation="landscape"/' android/app/src/main/AndroidManifest.xml
-          sed -i 's/<activity/<activity android:screenOrientation="landscape" android:configChanges="orientation|screenSize|keyboardHidden"/' android/app/src/main/AndroidManifest.xml
-          # Remove duplicate screenOrientation if any
-          python3 -c "
-          import re
-          with open('android/app/src/main/AndroidManifest.xml','r') as f: c=f.read()
-          # Ensure only one screenOrientation
-          c=re.sub(r'android:screenOrientation=\"[^\"]*\"\s*android:screenOrientation=\"[^\"]*\"','android:screenOrientation=\"landscape\"',c)
-          # Add fullscreen theme
-          c=c.replace('android:theme=\"@style/AppTheme\"','android:theme=\"@style/AppTheme\" android:windowSoftInputMode=\"adjustResize\"')
-          with open('android/app/src/main/AndroidManifest.xml','w') as f: f.write(c)
-          "
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          sed -i 's|</application>|<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-6853379352980306~7008734812"/>\n</application>|' $MANIFEST
+          sed -i 's|</manifest>|<uses-permission android:name="android.permission.INTERNET"/>\n<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n</manifest>|' $MANIFEST
+          sed -i 's/android:screenOrientation="[^"]*"/android:screenOrientation="landscape"/' $MANIFEST
  
-      - name: Configure fullscreen (no status bar)
+      - name: Configure fullscreen
         run: |
-          # Add fullscreen to styles.xml
-          cat > android/app/src/main/res/values/styles.xml << 'STYLES'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-            <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
-              <item name="android:windowNoTitle">true</item>
-              <item name="android:windowFullscreen">true</item>
-              <item name="android:windowContentOverlay">@null</item>
-              <item name="android:statusBarColor">@android:color/black</item>
-              <item name="android:navigationBarColor">@android:color/black</item>
-            </style>
-            <style name="AppTheme.NoActionBar" parent="AppTheme">
-              <item name="android:windowActionBar">false</item>
-              <item name="android:windowNoTitle">true</item>
-            </style>
-          </resources>
-          STYLES
- 
-      - name: Add AdMob META tag to AndroidManifest
-        run: |
-          sed -i 's|</application>|<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-6853379352980306~7008734812"/>\n</application>|' android/app/src/main/AndroidManifest.xml
- 
-      - name: Add internet permissions
-        run: |
-          sed -i 's|</manifest>|<uses-permission android:name="android.permission.INTERNET"/>\n<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n</manifest>|' android/app/src/main/AndroidManifest.xml
+          echo '<?xml version="1.0" encoding="utf-8"?><resources><style name="AppTheme" parent="Theme.AppCompat.NoActionBar"><item name="android:windowNoTitle">true</item><item name="android:windowFullscreen">true</item><item name="android:windowContentOverlay">@null</item><item name="android:statusBarColor">@android:color/black</item><item name="android:navigationBarColor">@android:color/black</item></style><style name="AppTheme.NoActionBar" parent="AppTheme"><item name="android:windowActionBar">false</item><item name="android:windowNoTitle">true</item></style></resources>' > android/app/src/main/res/values/styles.xml
  
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
  
-      - name: Create keystore.properties
+      - name: Create keystore properties
         run: |
-          cat > android/app/keystore.properties << EOF
-          storeFile=keystore.jks
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          EOF
+          echo "storeFile=keystore.jks" > android/app/keystore.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/app/keystore.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/keystore.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/app/keystore.properties
  
-      - name: Configure signing in build.gradle
+      - name: Configure signing
         run: |
-          python3 -c "
-          with open('android/app/build.gradle','r') as f: c=f.read()
- 
-          signing = '''
-    signingConfigs {
-        release {
-            def props = new Properties()
-            def propsFile = file('keystore.properties')
-            if (propsFile.exists()) {
-                props.load(new FileInputStream(propsFile))
-                storeFile file(props['storeFile'])
-                storePassword props['storePassword']
-                keyAlias props['keyAlias']
-                keyPassword props['keyPassword']
-            }
-        }
-    }
-'''
-          c = c.replace('android {', 'android {\n' + signing)
-          c = c.replace('buildTypes {', 'buildTypes {\n        release {\n            signingConfig signingConfigs.release\n            minifyEnabled false\n            proguardFiles getDefaultProguardFile(\"proguard-android.txt\"), \"proguard-rules.pro\"\n        }')
-          # Remove duplicate release block if exists
-          with open('android/app/build.gradle','w') as f: f.write(c)
-          "
+          cd android/app
+          sed -i '/android {/a\    signingConfigs { release { def p=new Properties(); def f=rootProject.file("app/keystore.properties"); if(f.exists()){p.load(new FileInputStream(f)); storeFile file(p["storeFile"]); storePassword p["storePassword"]; keyAlias p["keyAlias"]; keyPassword p["keyPassword"]} } }' build.gradle
+          sed -i '/buildTypes {/,/release {/ s/release {/release { signingConfig signingConfigs.release/' build.gradle
  
       - name: Build AAB
         working-directory: android
