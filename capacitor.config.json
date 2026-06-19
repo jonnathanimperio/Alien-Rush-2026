@@ -10,7 +10,11 @@
   },
   "plugins": {
     "AdMob": {
-      "androidAppId": "ca-app-pub-6853379352980306~7008734812"
+      "androidAppId": "ca-app-pub-6853379352980306~7008734812",
+      "initializeOnTesting": false,
+      "testingDevices": [],
+      "rewarded": true,
+      "interstitial": true
     }
   }
 }
