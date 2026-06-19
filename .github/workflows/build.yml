@@ -46,31 +46,9 @@ jobs:
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/app/keystore.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/keystore.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/app/keystore.properties
-          python3 << 'PYEOF'
-          with open("android/app/build.gradle","r") as f:
-              lines = f.readlines()
-          out = []
-          for line in lines:
-              out.append(line)
-              if line.strip() == "android {":
-                  out.append("    signingConfigs {\n")
-                  out.append("        release {\n")
-                  out.append("            def p = new Properties()\n")
-                  out.append("            def f = file('keystore.properties')\n")
-                  out.append("            if (f.exists()) {\n")
-                  out.append("                p.load(new FileInputStream(f))\n")
-                  out.append("                storeFile file(p['storeFile'])\n")
-                  out.append("                storePassword p['storePassword']\n")
-                  out.append("                keyAlias p['keyAlias']\n")
-                  out.append("                keyPassword p['keyPassword']\n")
-                  out.append("            }\n")
-                  out.append("        }\n")
-                  out.append("    }\n")
-              if line.strip().startswith("release {") and "signingConfig" not in line:
-                  out.append("                signingConfig signingConfigs.release\n")
-          with open("android/app/build.gradle","w") as f:
-              f.writelines(out)
-          PYEOF
+          cd android/app
+          sed -i '/android {/a\    signingConfigs { release { def p=new Properties(); def f=file("keystore.properties"); if(f.exists()){p.load(new FileInputStream(f)); storeFile file(p["storeFile"]); storePassword p["storePassword"]; keyAlias p["keyAlias"]; keyPassword p["keyPassword"]} } }' build.gradle
+          sed -i '0,/release {/{s/release {/release { signingConfig signingConfigs.release/}' build.gradle
       - name: Bump version
         run: |
           sed -i 's/versionCode [0-9]*/versionCode 8/' android/app/build.gradle
