@@ -18,51 +18,39 @@ jobs:
       - run: npm install
       - run: npx cap add android
       - run: npx cap sync android
-      - name: Debug
+      - name: Fix gradle
         run: |
-          echo "=== build.gradle ==="
-          cat android/app/build.gradle
-          echo "=== variables.gradle ==="
-          cat android/variables.gradle
-      - name: Replace icons
+          sed -i 's/rootProject.ext.compileSdkVersion/35/' android/app/build.gradle
+          sed -i 's/rootProject.ext.minSdkVersion/22/' android/app/build.gradle
+          sed -i 's/rootProject.ext.targetSdkVersion/35/' android/app/build.gradle
+      - name: Icons
         run: |
           B="android/app/src/main/res"
-          cp resources/icon-48.png $B/mipmap-mdpi/ic_launcher.png
-          cp resources/icon-72.png $B/mipmap-hdpi/ic_launcher.png
-          cp resources/icon-96.png $B/mipmap-xhdpi/ic_launcher.png
-          cp resources/icon-144.png $B/mipmap-xxhdpi/ic_launcher.png
-          cp resources/icon-192.png $B/mipmap-xxxhdpi/ic_launcher.png
-          cp resources/icon-48.png $B/mipmap-mdpi/ic_launcher_round.png
-          cp resources/icon-72.png $B/mipmap-hdpi/ic_launcher_round.png
-          cp resources/icon-96.png $B/mipmap-xhdpi/ic_launcher_round.png
-          cp resources/icon-144.png $B/mipmap-xxhdpi/ic_launcher_round.png
-          cp resources/icon-192.png $B/mipmap-xxxhdpi/ic_launcher_round.png
-      - name: Setup manifest
+          for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
+            density="${d%%:*}"; size="${d##*:}"
+            cp "resources/icon-${size}.png" "$B/mipmap-${density}/ic_launcher.png"
+            cp "resources/icon-${size}.png" "$B/mipmap-${density}/ic_launcher_round.png"
+          done
+      - name: Manifest
         run: |
           M="android/app/src/main/AndroidManifest.xml"
           sed -i 's|</application>|<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-6853379352980306~7008734812"/></application>|' $M
-          sed -i 's|</manifest>|<uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/></manifest>|' $M
-      - name: Fullscreen
+      - name: Styles
         run: echo '<?xml version="1.0" encoding="utf-8"?><resources><style name="AppTheme" parent="Theme.AppCompat.NoActionBar"><item name="android:windowNoTitle">true</item><item name="android:windowFullscreen">true</item><item name="android:windowContentOverlay">@null</item></style><style name="AppTheme.NoActionBar" parent="AppTheme"><item name="android:windowActionBar">false</item><item name="android:windowNoTitle">true</item></style><style name="AppTheme.NoActionBarLaunch" parent="AppTheme.NoActionBar"><item name="android:background">@android:color/black</item></style></resources>' > android/app/src/main/res/values/styles.xml
-      - name: Bump version
+      - name: Version
         run: |
           sed -i 's/versionCode [0-9]*/versionCode 8/' android/app/build.gradle
           sed -i 's/versionName "[^"]*"/versionName "2.0.1"/' android/app/build.gradle
-      - name: Update API level
-        run: |
-          sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 35/' android/app/build.gradle
-          sed -i "s/compileSdkVersion = .*/compileSdkVersion = 35/" android/variables.gradle
-          sed -i "s/targetSdkVersion = .*/targetSdkVersion = 35/" android/variables.gradle
       - name: Keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
       - name: Build
         run: |
           cd android && chmod +x gradlew
           ./gradlew bundleRelease \
-            -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
-            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+            -Pandroid.injected.signing.store.file=$PWD/app/keystore.jks \
+            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
       - uses: actions/upload-artifact@v4
         with:
           name: alien-rush-fx-release
