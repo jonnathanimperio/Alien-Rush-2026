@@ -78,8 +78,8 @@ jobs:
       - name: Update API level
         run: |
           sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 35/' android/app/build.gradle
-          sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 35/' android/variables.gradle
-          sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 35/' android/variables.gradle    
+          sed -i "s/compileSdkVersion = .*/compileSdkVersion = 35/" android/variables.gradle
+          sed -i "s/targetSdkVersion = .*/targetSdkVersion = 35/" android/variables.gradle  
       - name: Build
         run: cd android && chmod +x gradlew && ./gradlew bundleRelease
       - uses: actions/upload-artifact@v4
