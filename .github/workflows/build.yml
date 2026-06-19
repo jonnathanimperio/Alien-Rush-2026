@@ -56,7 +56,7 @@ jobs:
                   out.append("    signingConfigs {\n")
                   out.append("        release {\n")
                   out.append("            def p = new Properties()\n")
-                  out.append("            def f = rootProject.file('app/keystore.properties')\n")
+                  out.append("            def f = file('keystore.properties')\n")
                   out.append("            if (f.exists()) {\n")
                   out.append("                p.load(new FileInputStream(f))\n")
                   out.append("                storeFile file(p['storeFile'])\n")
