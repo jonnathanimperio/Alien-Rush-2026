@@ -37,12 +37,14 @@ jobs:
         run: |
           M="android/app/src/main/AndroidManifest.xml"
           sed -i 's|</application>|<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-6853379352980306~7008734812"/></application>|' $M
+          sed -i 's|<manifest |<manifest xmlns:tools="http://schemas.android.com/tools" |' $M
+          sed -i 's|</manifest>|<uses-permission android:name="com.google.android.gms.permission.AD_ID"/></manifest>|' $M
       - name: Styles
         run: echo '<?xml version="1.0" encoding="utf-8"?><resources><style name="AppTheme" parent="Theme.AppCompat.NoActionBar"><item name="android:windowNoTitle">true</item><item name="android:windowFullscreen">true</item><item name="android:windowContentOverlay">@null</item></style><style name="AppTheme.NoActionBar" parent="AppTheme"><item name="android:windowActionBar">false</item><item name="android:windowNoTitle">true</item></style><style name="AppTheme.NoActionBarLaunch" parent="AppTheme.NoActionBar"><item name="android:background">@android:color/black</item></style></resources>' > android/app/src/main/res/values/styles.xml
       - name: Version
         run: |
-          sed -i 's/versionCode [0-9]*/versionCode 10/' android/app/build.gradle
-          sed -i 's/versionName "[^"]*"/versionName "2.1.0"/' android/app/build.gradle
+          sed -i 's/versionCode [0-9]*/versionCode 11/' android/app/build.gradle
+          sed -i 's/versionName "[^"]*"/versionName "2.1.1"/' android/app/build.gradle
       - name: Keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
       - name: Build
