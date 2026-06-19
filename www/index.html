@@ -1025,7 +1025,7 @@ let prePhaseBonus=null; // 'shield' or 'grenade' bonus for next phase
 // ═══════════════════════════════════════════════════════════════════
 // ─── ADMOB INTEGRATION (Capacitor) ─────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════
-// TODO: Trocar pelos IDs do Alien Rush FX no AdMob
+// AdMob IDs - Alien Rush FX
 const ADMOB_INTERSTITIAL_ID = 'ca-app-pub-6853379352980306/7292639991';
 const ADMOB_REWARDED_ID     = 'ca-app-pub-6853379352980306/9657819580';
 
@@ -1040,13 +1040,13 @@ function admobInit(){
   admobPrepareInterstitial();
   admobPrepareRewarded();
   // Listeners
-  AdMob.addListener('onInterstitialAdLoaded',()=>{ adInterstitialReady=true; });
-  AdMob.addListener('onInterstitialAdFailedToLoad',()=>{ adInterstitialReady=false; setTimeout(admobPrepareInterstitial,30000); });
-  AdMob.addListener('onInterstitialAdDismissed',()=>{ adInterstitialReady=false; admobPrepareInterstitial(); });
+  AdMob.addListener('interstitialAdLoaded',()=>{ adInterstitialReady=true; });
+  AdMob.addListener('interstitialAdFailedToLoad',()=>{ adInterstitialReady=false; setTimeout(admobPrepareInterstitial,30000); });
+  AdMob.addListener('interstitialAdDismissed',()=>{ adInterstitialReady=false; admobPrepareInterstitial(); });
   AdMob.addListener('onRewardedVideoAdLoaded',()=>{ adRewardedReady=true; });
   AdMob.addListener('onRewardedVideoAdFailedToLoad',()=>{ adRewardedReady=false; setTimeout(admobPrepareRewarded,30000); });
   AdMob.addListener('onRewardedVideoAdDismissed',()=>{ adRewardedReady=false; admobPrepareRewarded(); });
-  AdMob.addListener('onRewarded',()=>{ if(adRewardCallback) adRewardCallback(); adRewardCallback=null; });
+  AdMob.addListener('onRewardedVideoAdReward',()=>{ if(adRewardCallback) adRewardCallback(); adRewardCallback=null; });
 }
 
 function admobPrepareInterstitial(){
@@ -1775,7 +1775,7 @@ function buildLobby(){
       div.appendChild(btn);
     }
     // Ad button to test locked weapon for 1 phase
-    if(!owned&&locked&&adRewardedReady){
+    if(!owned&&locked){
       const adBtn2=document.createElement('button');
       adBtn2.className='btn-buy';
       adBtn2.style.cssText='background:linear-gradient(90deg,#2a6600,#44aa00);border-color:#88ff00;font-size:9px;margin-top:4px;';
@@ -1817,7 +1817,7 @@ function buildLobby(){
   updateCoinDisplay();
   // Pre-phase bonus ads
   const ppAds=document.getElementById('prephaseAds');
-  if(ppAds) ppAds.style.display=adRewardedReady?'flex':'none';
+  if(ppAds) ppAds.style.display='flex';
   // Gamepad status
   updateGamepadStatus();
 }
@@ -2902,7 +2902,7 @@ function showDeath(){
   clearTempWeapon();
   saveGame();
 
-  const rewardBtn = adRewardedReady
+  const rewardBtn = true
     ? `<button onclick="watchAdRevive()" style="background:linear-gradient(90deg,#2a6600,#44aa00);border:1px solid #88ff00;color:#fff;margin-top:8px;text-shadow:0 0 8px #88ff00;">${t('watchAdRevive')}</button>`
     : '';
 
@@ -2926,7 +2926,7 @@ function showClear(bonus){
   // Interstitial sempre ao completar fase
   admobShowInterstitial();
   lastClearBonus=bonus;
-  const doubleBtn = adRewardedReady
+  const doubleBtn = true
     ? `<button onclick="watchAdDoubleCoins()" style="background:linear-gradient(90deg,#6a5500,#aa8800);border:1px solid #ffd700;color:#fff;margin-top:8px;text-shadow:0 0 8px #ffd700;">🎬 ${t('adDoubleCoins')} (+${bonus} FX)</button>`
     : '';
   showOverlay(`<h2 style="color:#ff0">${t('phaseComplete',phase)}</h2>
