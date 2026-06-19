@@ -18,6 +18,12 @@ jobs:
       - run: npm install
       - run: npx cap add android
       - run: npx cap sync android
+      - name: Debug
+        run: |
+          echo "=== build.gradle ==="
+          cat android/app/build.gradle
+          echo "=== variables.gradle ==="
+          cat android/variables.gradle
       - name: Replace icons
         run: |
           B="android/app/src/main/res"
