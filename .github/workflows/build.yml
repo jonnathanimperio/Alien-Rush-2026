@@ -71,7 +71,7 @@ jobs:
           with open("android/app/build.gradle","w") as f:
               f.writelines(out)
           PYEOF
-     - name: Bump version
+      - name: Bump version
         run: |
           sed -i 's/versionCode [0-9]*/versionCode 8/' android/app/build.gradle
           sed -i 's/versionName "[^"]*"/versionName "2.0.1"/' android/app/build.gradle
