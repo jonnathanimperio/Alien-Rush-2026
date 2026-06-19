@@ -71,6 +71,10 @@ jobs:
           with open("android/app/build.gradle","w") as f:
               f.writelines(out)
           PYEOF
+      - name: Bump version
+        run: |
+          sed -i 's/versionCode [0-9]*/versionCode 7/' android/app/build.gradle
+          sed -i 's/versionName "[^"]*"/versionName "2.0.0"/' android/app/build.gradle
       - name: Build
         run: cd android && chmod +x gradlew && ./gradlew bundleRelease
       - uses: actions/upload-artifact@v4
