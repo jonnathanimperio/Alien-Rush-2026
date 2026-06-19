@@ -38,17 +38,6 @@ jobs:
           sed -i 's|</manifest>|<uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/></manifest>|' $M
       - name: Fullscreen
         run: echo '<?xml version="1.0" encoding="utf-8"?><resources><style name="AppTheme" parent="Theme.AppCompat.NoActionBar"><item name="android:windowNoTitle">true</item><item name="android:windowFullscreen">true</item><item name="android:windowContentOverlay">@null</item></style><style name="AppTheme.NoActionBar" parent="AppTheme"><item name="android:windowActionBar">false</item><item name="android:windowNoTitle">true</item></style><style name="AppTheme.NoActionBarLaunch" parent="AppTheme.NoActionBar"><item name="android:background">@android:color/black</item></style></resources>' > android/app/src/main/res/values/styles.xml
-      - name: Keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
-      - name: Sign config
-        run: |
-          echo "storeFile=keystore.jks" > android/app/keystore.properties
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/app/keystore.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/keystore.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/app/keystore.properties
-          cd android/app
-          sed -i '/android {/a\    signingConfigs { release { def p=new Properties(); def f=file("keystore.properties"); if(f.exists()){p.load(new FileInputStream(f)); storeFile file(p["storeFile"]); storePassword p["storePassword"]; keyAlias p["keyAlias"]; keyPassword p["keyPassword"]} } }' build.gradle
-          sed -i '0,/release {/{s/release {/release { signingConfig signingConfigs.release/}' build.gradle
       - name: Bump version
         run: |
           sed -i 's/versionCode [0-9]*/versionCode 8/' android/app/build.gradle
@@ -57,9 +46,17 @@ jobs:
         run: |
           sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 35/' android/app/build.gradle
           sed -i "s/compileSdkVersion = .*/compileSdkVersion = 35/" android/variables.gradle
-          sed -i "s/targetSdkVersion = .*/targetSdkVersion = 35/" android/variables.gradle  
+          sed -i "s/targetSdkVersion = .*/targetSdkVersion = 35/" android/variables.gradle
+      - name: Keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
       - name: Build
-        run: cd android && chmod +x gradlew && ./gradlew bundleRelease
+        run: |
+          cd android && chmod +x gradlew
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
+            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
       - uses: actions/upload-artifact@v4
         with:
           name: alien-rush-fx-release
