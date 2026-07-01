@@ -228,6 +228,36 @@ canvas{
 #bG:active{background:#ff8800;color:#000;text-shadow:none;}
 
 #hint{display:none;}
+/* ─── ANALÓGICO (joystick) ─── */
+#joystick{
+  position:absolute;
+  bottom:24px;left:24px;
+  width:96px;height:96px;
+  border-radius:50%;
+  background:radial-gradient(circle at 50% 45%, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 70%, rgba(255,255,255,0.02) 100%);
+  border:2px solid rgba(204,255,0,0.25);
+  box-shadow:0 0 12px rgba(204,255,0,0.12),inset 0 0 16px rgba(0,0,0,0.25);
+  pointer-events:auto;
+  touch-action:none;
+  -webkit-tap-highlight-color:transparent;
+  z-index:5;
+}
+#joystickStick{
+  position:absolute;
+  top:50%;left:50%;
+  width:42px;height:42px;
+  margin:-21px 0 0 -21px;
+  border-radius:50%;
+  background:radial-gradient(circle at 38% 32%, rgba(240,255,208,0.45) 0%, rgba(143,194,58,0.35) 55%, rgba(79,122,24,0.3) 100%);
+  border:1px solid rgba(204,255,0,0.35);
+  box-shadow:0 0 10px rgba(204,255,0,0.3),inset 0 -3px 6px rgba(0,0,0,0.2),inset 0 2px 4px rgba(255,255,255,0.3);
+  pointer-events:none;
+  transition:transform 0.04s linear;
+}
+@media (max-width:500px){
+  #joystick{bottom:18px;left:16px;width:84px;height:84px;}
+  #joystickStick{width:38px;height:38px;margin:-19px 0 0 -19px;}
+}
 
 /* Botões menores em telas pequenas */
 @media (max-width:500px){
@@ -588,10 +618,8 @@ canvas{
   </div>
 </div>
 <div id="controls">
-  <button class="btn" id="bL">◀</button>
-  <button class="btn" id="bR">▶</button>
+  <div id="joystick"><div id="joystickStick"></div></div>
   <button class="btn" id="bJ">▲</button>
-  <button class="btn" id="bC">▼</button>
   <button class="btn" id="bG">💣<span id="ammoDisplay" style="font-size:12px;margin-left:2px;">3</span></button>
   <button class="btn" id="bS">🔫</button>
   <button class="btn" id="bU">↗</button>
@@ -1032,20 +1060,47 @@ const ADMOB_REWARDED_ID     = 'ca-app-pub-6853379352980306/9657819580';
 let adInterstitialReady = false;
 let adRewardedReady = false;
 let adRewardCallback = null;
+// ── Anti-spam controls (FIX) ──
+let admobInitialized = false;
+let admobPrepareScheduled = { interstitial: false, rewarded: false };
+let lastInterstitialTime = 0;
+const INTERSTITIAL_COOLDOWN = 90000; // 90s mínimo entre interstitials
 
 function admobInit(){
+  if(admobInitialized) return; // ⛔ não inicializa duas vezes (DOMContentLoaded + deviceready)
   if(!window.Capacitor||!window.Capacitor.Plugins||!window.Capacitor.Plugins.AdMob) return;
+  admobInitialized = true;
   const AdMob = window.Capacitor.Plugins.AdMob;
   AdMob.initialize({ initializeForTesting: false });
   admobPrepareInterstitial();
   admobPrepareRewarded();
-  // Listeners
+  // Listeners registrados UMA VEZ só
   AdMob.addListener('interstitialAdLoaded',()=>{ adInterstitialReady=true; });
-  AdMob.addListener('interstitialAdFailedToLoad',()=>{ adInterstitialReady=false; setTimeout(admobPrepareInterstitial,30000); });
-  AdMob.addListener('interstitialAdDismissed',()=>{ adInterstitialReady=false; admobPrepareInterstitial(); });
+  AdMob.addListener('interstitialAdFailedToLoad',()=>{
+    adInterstitialReady=false;
+    if(admobPrepareScheduled.interstitial) return; // ⛔ já tem prepare agendado
+    admobPrepareScheduled.interstitial = true;
+    setTimeout(()=>{ admobPrepareScheduled.interstitial=false; admobPrepareInterstitial(); }, 60000);
+  });
+  AdMob.addListener('interstitialAdDismissed',()=>{
+    adInterstitialReady=false;
+    if(admobPrepareScheduled.interstitial) return;
+    admobPrepareScheduled.interstitial = true;
+    setTimeout(()=>{ admobPrepareScheduled.interstitial=false; admobPrepareInterstitial(); }, 5000);
+  });
   AdMob.addListener('onRewardedVideoAdLoaded',()=>{ adRewardedReady=true; });
-  AdMob.addListener('onRewardedVideoAdFailedToLoad',()=>{ adRewardedReady=false; setTimeout(admobPrepareRewarded,30000); });
-  AdMob.addListener('onRewardedVideoAdDismissed',()=>{ adRewardedReady=false; admobPrepareRewarded(); });
+  AdMob.addListener('onRewardedVideoAdFailedToLoad',()=>{
+    adRewardedReady=false;
+    if(admobPrepareScheduled.rewarded) return;
+    admobPrepareScheduled.rewarded = true;
+    setTimeout(()=>{ admobPrepareScheduled.rewarded=false; admobPrepareRewarded(); }, 60000);
+  });
+  AdMob.addListener('onRewardedVideoAdDismissed',()=>{
+    adRewardedReady=false;
+    if(admobPrepareScheduled.rewarded) return;
+    admobPrepareScheduled.rewarded = true;
+    setTimeout(()=>{ admobPrepareScheduled.rewarded=false; admobPrepareRewarded(); }, 5000);
+  });
   AdMob.addListener('onRewardedVideoAdReward',()=>{ if(adRewardCallback) adRewardCallback(); adRewardCallback=null; });
 }
 
@@ -1061,16 +1116,24 @@ function admobPrepareRewarded(){
 
 function admobShowInterstitial(){
   if(!window.Capacitor?.Plugins?.AdMob||!adInterstitialReady) return;
-  window.Capacitor.Plugins.AdMob.showInterstitial();
-  adInterstitialReady=false;
+  // ⏱ frequency cap — 90s mínimo entre interstitials
+  const now = Date.now();
+  if(now - lastInterstitialTime < INTERSTITIAL_COOLDOWN) return;
+  try {
+    window.Capacitor.Plugins.AdMob.showInterstitial();
+    lastInterstitialTime = now;
+    adInterstitialReady=false;
+  } catch(e){ console.warn('AdMob interstitial show failed', e); }
 }
 
 function admobShowRewarded(callback){
   if(!window.Capacitor?.Plugins?.AdMob||!adRewardedReady) return false;
-  adRewardCallback=callback;
-  window.Capacitor.Plugins.AdMob.showRewardVideoAd();
-  adRewardedReady=false;
-  return true;
+  try {
+    adRewardCallback=callback;
+    window.Capacitor.Plugins.AdMob.showRewardVideoAd();
+    adRewardedReady=false;
+    return true;
+  } catch(e){ console.warn('AdMob rewarded show failed', e); return false; }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1173,12 +1236,12 @@ const PHASE_CFG=[
   {kills:48,spawnI:40, bonus:450,desc:'Planeta Gelo',       aliens:[3,4,5,8,8,6,6,8],     spawnTypes:[3,4,5,6,8,8],     bg:'ice'},
   {kills:46,spawnI:42, bonus:500,desc:'Núcleo de Fogo',     aliens:[2,3,4,5,5,6,6,3],     spawnTypes:[2,3,4,5,5,6],     bg:'lava'},
   {kills:50,spawnI:38, bonus:600,desc:'Dimensão Sombria',   aliens:[3,3,5,5,6,6,4,7],     spawnTypes:[3,4,5,5,6,7],     bg:'void'},
-  // ─── NEW PHASES 10-14 ───
-  {kills:55,spawnI:34, bonus:700,desc:'Parque de Diversão',  aliens:[2,3,5,5,6,6,7,4],     spawnTypes:[2,3,4,5,6,7],     bg:'park'},
-  {kills:60,spawnI:30, bonus:800,desc:'Praia Tropical',      aliens:[2,3,5,6,6,7,7,6],     spawnTypes:[2,3,5,6,7,7],     bg:'beach'},
-  {kills:65,spawnI:27, bonus:900,desc:'Cidade Solar',         aliens:[2,5,6,6,7,7,6,7],     spawnTypes:[2,3,5,6,7,7],     bg:'daycity'},
-  {kills:70,spawnI:24, bonus:1000,desc:'Selva Tropical',     aliens:[2,5,6,6,7,7,7,6],     spawnTypes:[2,5,6,7,7,7],     bg:'jungle'},
-  {kills:80,spawnI:20, bonus:1200,desc:'Via Láctea',         aliens:[2,5,6,7,7,7,6,7],     spawnTypes:[2,6,6,7,7,7],     bg:'arena'},
+  // ─── NEW PHASES 10-14 (dificuldade reduzida) ───
+  {kills:34,spawnI:62, bonus:700,desc:'Parque de Diversão',  aliens:[2,3,5,5,6,6,7,4],     spawnTypes:[2,3,4,5,6,7],     bg:'park'},
+  {kills:37,spawnI:58, bonus:800,desc:'Praia Tropical',      aliens:[2,3,5,6,6,7,7,6],     spawnTypes:[2,3,5,6,7,7],     bg:'beach'},
+  {kills:40,spawnI:54, bonus:900,desc:'Cidade Solar',         aliens:[2,5,6,6,7,7,6,7],     spawnTypes:[2,3,5,6,7,7],     bg:'daycity'},
+  {kills:43,spawnI:50, bonus:1000,desc:'Selva Tropical',     aliens:[2,5,6,6,7,7,7,6],     spawnTypes:[2,5,6,7,7,7],     bg:'jungle'},
+  {kills:46,spawnI:46, bonus:1200,desc:'Via Láctea',         aliens:[2,5,6,7,7,7,6,7],     spawnTypes:[2,6,6,7,7,7],     bg:'arena'},
   // BOSS FINAL (phase 15)
   {kills:30,spawnI:25, bonus:2000,desc:'BOSS FINAL',         aliens:[2,5,6,7,7,7,6,7,7],   spawnTypes:[2,5,6,7,7,7],     bg:'boss'},
 ];
@@ -1875,7 +1938,58 @@ function holdBtn(id,key){
   el.addEventListener('pointerup',e=>{e.preventDefault();inp[key]=false;});
   el.addEventListener('pointerleave',()=>inp[key]=false);
 }
-holdBtn('bL','left');holdBtn('bR','right');holdBtn('bJ','jump');holdBtn('bC','crouch');
+holdBtn('bJ','jump');
+// ─── ANALÓGICO (substitui ◀ ▶ ▼) ───
+(function setupJoystick(){
+  const base=document.getElementById('joystick');
+  const stick=document.getElementById('joystickStick');
+  if(!base||!stick) return;
+  let active=false, pid=null;
+  const maxR=27;          // raio máximo de deslocamento do stick (px)
+  const deadzone=0.28;    // zona morta pra não andar com toque mínimo
+
+  function setFromEvent(e){
+    const rect=base.getBoundingClientRect();
+    const cxp=rect.left+rect.width/2;
+    const cyp=rect.top+rect.height/2;
+    let dx=e.clientX-cxp;
+    let dy=e.clientY-cyp;
+    const dist=Math.hypot(dx,dy)||1;
+    const clamped=Math.min(dist,maxR);
+    const nx=(dx/dist), ny=(dy/dist);
+    // posiciona o stick visualmente
+    stick.style.transform=`translate(${nx*clamped}px,${ny*clamped}px)`;
+    // normaliza -1..1
+    const hx=(nx*clamped)/maxR;
+    const hy=(ny*clamped)/maxR;
+    inp.left  = hx < -deadzone;
+    inp.right = hx >  deadzone;
+    inp.crouch= hy >  deadzone; // empurrar pra baixo = agachar
+  }
+  function reset(){
+    stick.style.transform='translate(0px,0px)';
+    inp.left=false; inp.right=false; inp.crouch=false;
+  }
+  base.addEventListener('pointerdown',e=>{
+    e.preventDefault(); active=true; pid=e.pointerId;
+    base.setPointerCapture(pid);
+    setFromEvent(e);
+  });
+  base.addEventListener('pointermove',e=>{
+    if(!active||e.pointerId!==pid) return;
+    e.preventDefault(); setFromEvent(e);
+  });
+  base.addEventListener('pointerup',e=>{
+    if(e.pointerId!==pid) return;
+    active=false; pid=null; reset();
+  });
+  base.addEventListener('pointercancel',e=>{
+    active=false; pid=null; reset();
+  });
+  base.addEventListener('lostpointercapture',()=>{
+    active=false; pid=null; reset();
+  });
+})();
 document.getElementById('bS').addEventListener('pointerdown',e=>{e.preventDefault();shoot(false);});
 document.getElementById('bG').addEventListener('pointerdown',e=>{e.preventDefault();throwGrenade();});
 document.getElementById('bU').addEventListener('pointerdown',e=>{e.preventDefault();shoot(true);});
@@ -2395,12 +2509,12 @@ function update(){
     const t=cfg.spawnTypes;
     spawnA(t[Math.floor(Math.random()*t.length)]);
     // Double spawn burst — gradual increase
-    const burstChance = phase>=13?0.45 : phase>=10?0.38 : phase>=7?0.30 : 0.22;
+    const burstChance = phase>=15?0.45 : phase>=10?0.22 : phase>=7?0.30 : 0.22;
     if(Math.random()<burstChance&&aliens.length<MAX_ALIENS-1){
       setTimeout(()=>{if(running)spawnA(t[Math.floor(Math.random()*t.length)]);},150);
     }
     // Triple spawn burst (only phase 7+)
-    const tripleChance = phase>=13?0.18 : phase>=10?0.12 : phase>=7?0.06 : 0;
+    const tripleChance = phase>=15?0.18 : phase>=10?0.04 : phase>=7?0.06 : 0;
     if(tripleChance>0&&Math.random()<tripleChance&&aliens.length<MAX_ALIENS-2){
       setTimeout(()=>{if(running)spawnA(t[Math.floor(Math.random()*t.length)]);},320);
     }
@@ -3344,8 +3458,7 @@ function goLobby(){
   document.getElementById('pauseMenu').classList.remove('show');
   stopMusic();
   victoryScene=0;
-  // Interstitial sempre que volta pro lobby
-  admobShowInterstitial();
+  // ✅ ANÚNCIO REMOVIDO do lobby — só toca em showClear() agora, com cap de 90s.
   saveGame();
   lobby.style.display='flex';buildLobby();
   // Start loop only if not already running
